@@ -48,7 +48,8 @@ namespace ServerSentEventsTest
                 {
                     try
                     {
-                        s.WriteLine(msg.ToString());
+                        var text = msg.ToString();
+                        s.WriteLine(text);
                         s.Flush();
                     }
                     catch (HttpException ex)

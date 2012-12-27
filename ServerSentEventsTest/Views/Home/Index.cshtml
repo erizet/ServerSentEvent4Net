@@ -1,11 +1,14 @@
-﻿@{
+﻿@using ServerSentEventsTest;
+
+@{
     ViewBag.Title = "SSE Testpage";
 }
 
 <h2>Testpage for Server-Sent Events using ASP.NET MVC</h2>
 
 <p>The following list is updated from @{string relPath = Url.HttpRouteUrl("DefaultApi", new { controller = "SSE" });
-                                        string absPath = new Uri(Request.Url, relPath).AbsoluteUri.ToString(); @absPath }.</p>
+                                        string absPath = Url.ToPublicUrl(relPath);
+                                        @absPath }.</p>
 @*        string storeLink = Url.HttpRouteUrl("DefaultApi", new { controller = "Store", id = store.Id });
           store.Url = new Uri(Request.Url, storeLink).AbsoluteUri.ToString();*@
 
@@ -18,10 +21,10 @@
     $(function () {
 
         if (!!window.EventSource) {
-            var source = new EventSource('@absPath');
+            var source = new EventSource('api/SSE');
             source.addEventListener('message', function (e) {
                 console.log(e.data);
-                $('#messagesList').append($('<li>').append(e.data).append('</li>').effect('highlight', {}, 1000));
+                $('#messagesList').append($('<li>').append(e.data).append('</li>'));
                 
 
                 if($('#messagesList > li').length > 10)
