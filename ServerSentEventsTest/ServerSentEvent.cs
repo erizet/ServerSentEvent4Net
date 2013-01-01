@@ -10,6 +10,9 @@ namespace ServerSentEventsTest
 {
     internal class ServerSentEvent
     {
+        public event EventHandler<SubscriberEventArgs> SubscriberAdded;
+        public event EventHandler<SubscriberEventArgs> SubscriberRemoved;
+
         protected List<StreamWriter> m_streams = new List<StreamWriter>();
         protected object mLock = new object();
 
@@ -26,6 +29,7 @@ namespace ServerSentEventsTest
             lock (mLock)
             {
                 m_streams.Add(streamwriter);
+                OnSubscriberAdded(m_streams.Count);
             }
         }
 
@@ -64,8 +68,21 @@ namespace ServerSentEventsTest
                 foreach (var s in toRemove)
                 {
                     m_streams.Remove(s);
+                    OnSubscriberRemoved(m_streams.Count);
                 }
             }
+        }
+
+        protected void OnSubscriberAdded(int subscriberCount)
+        {
+            if (SubscriberAdded != null)
+                SubscriberAdded(this, new SubscriberEventArgs(subscriberCount));
+        }
+
+        protected void OnSubscriberRemoved(int subscriberCount)
+        {
+            if (SubscriberRemoved != null)
+                SubscriberRemoved(this, new SubscriberEventArgs(subscriberCount));
         }
 
 

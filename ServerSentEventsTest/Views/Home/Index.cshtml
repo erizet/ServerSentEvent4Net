@@ -14,7 +14,9 @@
 
 <ul id="messagesList">
     
-</ul>   
+</ul>
+    
+<p>Number of connected clients: <span id="clientsCounterSpan"></span></p>  
 
 @section scripts {
 <script type="text/javascript">
@@ -41,6 +43,23 @@
                     console.log("error!");
                 }
             }, false);
+
+            var clients = new EventSource('api/Clients');
+            clients.addEventListener('message', function (e) {
+                console.log(e.data);
+                $('#clientsCounterSpan').text(e.data);
+            }, false);
+
+            clients.addEventListener('open', function (e) {
+                console.log("clients counter open!");
+            }, false);
+
+            clients.addEventListener('error', function (e) {
+                if (e.readyState == EventSource.CLOSED) {
+                    console.log("error in clientscounter!");
+                }
+            }, false);
+
 
         } else {
             // not supported!               

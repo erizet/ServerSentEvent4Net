@@ -17,6 +17,17 @@ namespace ServerSentEventsTest.Controllers
         private static readonly Lazy<Timer> _timer = new Lazy<Timer>(() => new Timer(TimerCallback, null, 0, 1000));
         private static readonly ServerSentEvent SSE = new ServerSentEvent();
 
+        static SSEController()
+        {
+            SSE.SubscriberAdded += SSE_SubscriberChanged;
+            SSE.SubscriberRemoved += SSE_SubscriberChanged;
+        }
+
+        static void SSE_SubscriberChanged(object sender, SubscriberEventArgs e)
+        {
+            ClientsController.Send(e.SubscriberCount.ToString());
+        }
+
         public HttpResponseMessage Get(HttpRequestMessage request)
         {
             Timer t = _timer.Value;
