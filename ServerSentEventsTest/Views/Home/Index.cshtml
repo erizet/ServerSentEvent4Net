@@ -23,6 +23,25 @@
     $(function () {
 
         if (!!window.EventSource) {
+            var clients = new EventSource('api/Clients');
+            clients.addEventListener('message', function (e) {
+                console.log(e.data);
+                $('#clientsCounterSpan').text(e.data);
+            }, false);
+
+            clients.addEventListener('open', function (e) {
+                console.log("clients counter open!");
+            }, false);
+
+            clients.addEventListener('error', function (e) {
+                if (e.readyState == EventSource.CLOSED) {
+                    console.log("error in clientscounter!");
+                }
+            }, false);
+
+
+
+
             var source = new EventSource('api/SSE');
             source.addEventListener('message', function (e) {
                 console.log(e.data);
@@ -44,21 +63,6 @@
                 }
             }, false);
 
-            var clients = new EventSource('api/Clients');
-            clients.addEventListener('message', function (e) {
-                console.log(e.data);
-                $('#clientsCounterSpan').text(e.data);
-            }, false);
-
-            clients.addEventListener('open', function (e) {
-                console.log("clients counter open!");
-            }, false);
-
-            clients.addEventListener('error', function (e) {
-                if (e.readyState == EventSource.CLOSED) {
-                    console.log("error in clientscounter!");
-                }
-            }, false);
 
 
         } else {
