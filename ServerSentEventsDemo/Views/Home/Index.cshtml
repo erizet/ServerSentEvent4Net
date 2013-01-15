@@ -1,0 +1,79 @@
+﻿@using ServerSentEventsTest;
+
+@{
+    ViewBag.Title = "SSE Testpage";
+}
+
+<h2>Testpage for Server-Sent Events using ASP.NET WebApi</h2>
+
+<p>This page uses <a href="#">ServerSentEvent4Net</a>, which is available as a <a href="#">NuGet-package</a>.</p>
+
+<p>The following list is updated from @{string relPath = Url.HttpRouteUrl("DefaultApi", new { controller = "SSE" });
+                                        string absPath = Url.ToPublicUrl(relPath);
+                                        @absPath }.</p>
+@*        string storeLink = Url.HttpRouteUrl("DefaultApi", new { controller = "Store", id = store.Id });
+          store.Url = new Uri(Request.Url, storeLink).AbsoluteUri.ToString();*@
+
+<ul id="messagesList">
+    
+</ul>
+    
+<p>Number of connected clients: <span id="clientsCounterSpan"></span></p>  
+
+@section scripts {
+<script type="text/javascript">
+    $(function () {
+
+        if (!!window.EventSource) {
+
+            var clients = new EventSource('api/Clients');
+            clients.addEventListener('message', function (e) {
+                console.log(e.data);
+                $('#clientsCounterSpan').text(e.data);
+            }, false);
+
+            clients.addEventListener('open', function (e) {
+                console.log("clients counter open!");
+            }, false);
+
+            clients.addEventListener('error', function (e) {
+                if (e.readyState == EventSource.CLOSED) {
+                    console.log("error in clientscounter!");
+                }
+            }, false);
+
+
+
+
+            var source = new EventSource('api/SSE');
+            source.addEventListener('message', function (e) {
+                console.log(e.data);
+                $('#messagesList').append($('<li>').append(e.data).append('</li>'));
+                
+
+                if($('#messagesList > li').length > 10)
+                    $('#messagesList li:first').remove();
+
+            }, false);
+
+            source.addEventListener('open', function (e) {
+                console.log("open!");
+            }, false);
+
+            source.addEventListener('error', function (e) {
+                if (e.readyState == EventSource.CLOSED) {
+                    console.log("error!");
+                }
+            }, false);
+
+
+
+        } else {
+            // not supported!               
+        }
+        
+        
+    });
+
+</script>
+}
