@@ -17,6 +17,7 @@ namespace ServerSentEvent4Net
         protected object mLock = new object();
         protected IMessageHistory mMessageHistory = null;
         protected IMessageIdGenerator mIdGenerator = null;
+        private static readonly slf4net.ILogger _logger = slf4net.LoggerFactory.GetLogger(typeof(ServerSentEvent));
 
         public ServerSentEvent(int noOfMessagesToRemember, bool generateMessageIds = false)
         {
@@ -95,16 +96,21 @@ namespace ServerSentEvent4Net
             if (removed > 0)
                 OnSubscriberRemoved(count);
 
+            _logger.Info("Message: " + msg.Data + " sent to " + count.ToString() + " clients.");
         }
 
         protected void OnSubscriberAdded(int subscriberCount)
         {
+            _logger.Info("Subscriber added. No of subscribers: " + subscriberCount);
+
             if (SubscriberAdded != null)
                 SubscriberAdded(this, new SubscriberEventArgs(subscriberCount));
         }
 
         protected void OnSubscriberRemoved(int subscriberCount)
         {
+            _logger.Info("Subscriber removed. No of subscribers: " + subscriberCount);
+
             if (SubscriberRemoved != null)
                 SubscriberRemoved(this, new SubscriberEventArgs(subscriberCount));
         }
