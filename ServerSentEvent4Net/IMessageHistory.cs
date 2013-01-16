@@ -6,6 +6,9 @@ using System.Threading.Tasks;
 
 namespace ServerSentEvent4Net
 {
+    /// <summary>
+    /// A store for sent messages. Used by reconnected clients to catch up missed messages.
+    /// </summary>
     public interface IMessageHistory
     {
         /// <summary>
