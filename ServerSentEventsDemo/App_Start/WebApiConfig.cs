@@ -11,8 +11,8 @@ namespace ServerSentEventsTest
         {
             config.Routes.MapHttpRoute(
                 name: "DefaultApi",
-                routeTemplate: "api/{controller}/{id}",
-                defaults: new { id = RouteParameter.Optional }
+                routeTemplate: "api/{controller}/{filter}",
+                defaults: new { filter = RouteParameter.Optional }
             );
         }
     }

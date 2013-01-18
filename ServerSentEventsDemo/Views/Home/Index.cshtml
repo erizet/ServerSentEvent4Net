@@ -14,6 +14,14 @@
 @*        string storeLink = Url.HttpRouteUrl("DefaultApi", new { controller = "Store", id = store.Id });
           store.Url = new Uri(Request.Url, storeLink).AbsoluteUri.ToString();*@
 
+<p>Filter messages when subscribing to this event.</p>
+<form id="criteria">
+    <input type="radio" name="filter" value="both" checked="checked">Both<br />
+    <input type="radio" name="filter" value="odd">Odd<br />
+    <input type="radio" name="filter" value="even">Even<br />
+</form>
+
+
 <ul id="messagesList">
     
 </ul>
@@ -23,6 +31,18 @@
 @section scripts {
 <script type="text/javascript">
     $(function () {
+
+        $("#criteria").change(function () {
+            var message_index
+
+            var selectedText = $('input[name=filter]:checked', '#criteria').val()
+            alert(selectedText);
+
+            startSubscription('api/SSE/' + selectedText);
+
+        });
+
+
 
         if (!!window.EventSource) {
 
@@ -42,30 +62,7 @@
                 }
             }, false);
 
-
-
-
-            var source = new EventSource('api/SSE');
-            source.addEventListener('message', function (e) {
-                console.log(e.data);
-                $('#messagesList').append($('<li>').append(e.data).append('</li>'));
-                
-
-                if($('#messagesList > li').length > 10)
-                    $('#messagesList li:first').remove();
-
-            }, false);
-
-            source.addEventListener('open', function (e) {
-                console.log("open!");
-            }, false);
-
-            source.addEventListener('error', function (e) {
-                if (e.readyState == EventSource.CLOSED) {
-                    console.log("error!");
-                }
-            }, false);
-
+            startSubscription('api/SSE');
 
 
         } else {
@@ -74,6 +71,38 @@
         
         
     });
+
+    var eventSource = undefined;
+
+    function startSubscription(path)
+    {
+        if (typeof eventSource != 'undefined') {
+            eventSource.close();
+        };
+        eventSource = undefined;
+        var source = new EventSource(path);
+        source.addEventListener('message', function (e) {
+            console.log(e.data);
+            $('#messagesList').append($('<li>').append(e.data).append('</li>'));
+
+
+            if ($('#messagesList > li').length > 10)
+                $('#messagesList li:first').remove();
+
+        }, false);
+
+        source.addEventListener('open', function (e) {
+            console.log("open!");
+        }, false);
+
+        source.addEventListener('error', function (e) {
+            if (e.readyState == EventSource.CLOSED) {
+                console.log("error!");
+            }
+        }, false);
+
+        eventSource = source;
+    }
 
 </script>
 }

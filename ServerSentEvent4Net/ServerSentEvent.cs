@@ -14,12 +14,34 @@ namespace ServerSentEvent4Net
     /// <typeparam name="ClientInfo">Type to carry additional information for each client/subscriber.</typeparam>
     public class ServerSentEvent<ClientInfo> : ServerSentEvent
     {
-        protected virtual List<ClientWithInformation<ClientInfo>> mClients = new List<ClientWithInformation<ClientInfo>>();
+        public ServerSentEvent(int noOfMessagesToRemember, bool generateMessageIds = false)
+            : base(noOfMessagesToRemember, generateMessageIds)
+        { }
+        public ServerSentEvent(IMessageHistory messageHistory, IMessageIdGenerator idGenerator)
+            : base(messageHistory, idGenerator)
+        { }
 
-        
+        /// <summary>
+        /// Sends data to all subscribers fulfilling the criteria.
+        /// </summary>
+        /// <param name="data">The data to send.</param>
+        /// <param name="criteria">The criteria to be fulfilled to get the data.</param>
         public void Send(string data, Func<ClientInfo, bool> criteria) { Send(new Message() { Data = data }, criteria); }
-        public void Send(string eventType, string data, Func<ClientInfo, bool> criteria) { Send(new Message() { EventType = eventType, Data = data }, criteria); }
-        public void Send(string eventType, string data, string messageId, Func<ClientInfo, bool> criteria) { Send(new Message() { EventType = eventType, Data = data, Id = messageId }, criteria); }
+        /// <summary>
+        /// Sends data to all subscribers fulfilling the criteria.
+        /// </summary>
+        /// <param name="data">The data to send.</param>
+        /// <param name="messageId">The id of the message.</param>
+        /// <param name="criteria">The criteria to be fulfilled to get the data.</param>
+        public void Send(string data, string eventType, Func<ClientInfo, bool> criteria) { Send(new Message() { EventType = eventType, Data = data }, criteria); }
+        /// <summary>
+        /// Sends data to all subscribers fulfilling the criteria.
+        /// </summary>
+        /// <param name="eventType">The type of event.</param>
+        /// <param name="data">The data to send.</param>
+        /// <param name="messageId">The id of the message.</param>
+        /// <param name="criteria">The criteria to be fulfilled to get the data.</param>
+        public void Send(string data, string eventType, string messageId, Func<ClientInfo, bool> criteria) { Send(new Message() { EventType = eventType, Data = data, Id = messageId }, criteria); }
 
         public HttpResponseMessage AddSubscriber(HttpRequestMessage request, ClientInfo clientInfo)
         {
@@ -32,7 +54,7 @@ namespace ServerSentEvent4Net
         {
             ClientInfo info = default(ClientInfo);
 
-            if(content is PushStreamContentWithClientInfomation<ClientInfo>)
+            if (content is PushStreamContentWithClientInfomation<ClientInfo>)
             {
                 PushStreamContentWithClientInfomation<ClientInfo> contentWithInfo = content as PushStreamContentWithClientInfomation<ClientInfo>;
                 info = contentWithInfo.Info;
@@ -56,7 +78,13 @@ namespace ServerSentEvent4Net
             lock (mLock)
             {
                 // Only send message to clients fullfilling the criteria
-                var filtered = mClients.Where(c => criteria(c.Info)).ToList();
+                var filtered = mClients
+                                .Where(c => c is ClientWithInformation<ClientInfo>)
+                                    .Where(c =>
+                                    {
+                                        var clientWithInfo = c as ClientWithInformation<ClientInfo>;
+                                        return clientWithInfo.Info == null ? false : criteria(clientWithInfo.Info);
+                                    }).ToList();
                 filtered.ForEach(c => c.Send(msg));
                 removed = mClients.RemoveAll(c => !c.IsConnected);
                 count = filtered.Count;
@@ -70,32 +98,32 @@ namespace ServerSentEvent4Net
 
 
 
-        protected class ClientWithInformation<ClientInfo> : Client
+        protected class ClientWithInformation<Data> : Client
         {
-            public ClientWithInformation(Stream stream, string lastMessageId, ClientInfo clientInfo)
+            public ClientWithInformation(Stream stream, string lastMessageId, Data clientInfo)
                 : base(stream, lastMessageId)
             {
                 this.Info = clientInfo;
             }
 
-            public ClientWithInformation(Stream stream, ClientInfo clientInfo)
+            public ClientWithInformation(Stream stream, Data clientInfo)
                 : base(stream)
             {
                 this.Info = clientInfo;
             }
 
-            public ClientInfo Info { get; private set; }
+            public Data Info { get; private set; }
         }
 
-        protected class PushStreamContentWithClientInfomation<ClientInfo> : PushStreamContent
+        protected class PushStreamContentWithClientInfomation<Data> : PushStreamContent
         {
-            public PushStreamContentWithClientInfomation(Action<Stream, HttpContent, System.Net.TransportContext> onStreamAvailable, string mediaType, ClientInfo clientInfo)
+            public PushStreamContentWithClientInfomation(Action<Stream, HttpContent, System.Net.TransportContext> onStreamAvailable, string mediaType, Data clientInfo)
                 : base(onStreamAvailable, mediaType)
             {
                 this.Info = clientInfo;
             }
 
-            public ClientInfo Info { get; private set; }
+            public Data Info { get; private set; }
         }
     }
 
@@ -105,7 +133,7 @@ namespace ServerSentEvent4Net
         public event EventHandler<SubscriberEventArgs> SubscriberAdded;
         public event EventHandler<SubscriberEventArgs> SubscriberRemoved;
 
-        protected virtual List<Client> mClients = new List<Client>();
+        protected List<Client> mClients = new List<Client>();
         protected object mLock = new object();
         protected IMessageHistory mMessageHistory = null;
         protected IMessageIdGenerator mIdGenerator = null;
@@ -173,8 +201,8 @@ namespace ServerSentEvent4Net
         }
 
         public void Send(string data) { Send(new Message() { Data = data }); }
-        public void Send(string eventType, string data) { Send(new Message() { EventType = eventType, Data = data }); }
-        public void Send(string eventType, string data, string messageId) { Send(new Message() { EventType = eventType, Data = data, Id = messageId }); }
+        public void Send(string data, string eventType) { Send(new Message() { EventType = eventType, Data = data }); }
+        public void Send(string data, string eventType, string messageId) { Send(new Message() { EventType = eventType, Data = data, Id = messageId }); }
 
         private void Send(Message msg)
         {
