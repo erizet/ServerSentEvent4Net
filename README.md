@@ -39,8 +39,5 @@ For a complete sample, see the demo-project!
 ##Logging##
 ServerSentEvent4Net uses [slf4net] as a logging facade.
 
-##ToDo##
-- Implement functionallity to only send to subcribers fullfilling a criteria.
-
 ##Contributions##
 I'll be more than happy to get contributions!!!
