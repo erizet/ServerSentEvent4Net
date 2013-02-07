@@ -161,6 +161,8 @@ namespace ServerSentEvent4Net
         public HttpResponseMessage AddSubscriber(HttpRequestMessage request)
         {
             HttpResponseMessage response = request.CreateResponse();
+            response.Headers.Add("Access-Control-Allow-Origin", "*");
+            response.Headers.Add("Cache-Control", "no-cache, must-revalidate");
             response.Content = new PushStreamContent(OnStreamAvailable, "text/event-stream");
             return response;
         }
