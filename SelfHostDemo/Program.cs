@@ -1,4 +1,7 @@
 ﻿using ServerSentEvent4Net;
+using slf4net;
+using slf4net.Factories;
+using slf4net.Resolvers;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -31,6 +34,7 @@ namespace SelfHostDemo
         
         static void Main(string[] args)
         {
+            LoggerFactory.SetFactoryResolver(new SimpleFactoryResolver(new ConsoleLogger()));
             HttpSelfHostServer server = null;
             try
             {
