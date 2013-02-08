@@ -10,7 +10,7 @@
     <projectUrl>https://github.com/erizet/ServerSentEvent4Net</projectUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <description>$description$</description>
-    <releaseNotes>New generic version which supports message filtering.</releaseNotes>
+    <releaseNotes>Added heartbeat sending.</releaseNotes>
     <copyright>Copyright 2013</copyright>
     <tags>SSE Server-Sent Events EventSource</tags>
     <dependencies>
