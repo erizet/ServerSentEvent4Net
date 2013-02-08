@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Text;
+using System.Threading;
 using System.Web;
 
 namespace ServerSentEvent4Net
@@ -14,10 +15,10 @@ namespace ServerSentEvent4Net
     /// <typeparam name="ClientInfo">Type to carry additional information for each client/subscriber.</typeparam>
     public class ServerSentEvent<ClientInfo> : ServerSentEvent
     {
-        public ServerSentEvent(int noOfMessagesToRemember, bool generateMessageIds = false)
+        public ServerSentEvent(int noOfMessagesToRemember, bool generateMessageIds = false, int heartbeatInterval = 0)
             : base(noOfMessagesToRemember, generateMessageIds)
         { }
-        public ServerSentEvent(IMessageHistory messageHistory, IMessageIdGenerator idGenerator)
+        public ServerSentEvent(IMessageHistory messageHistory, IMessageIdGenerator idGenerator, int heartbeatInterval = 0)
             : base(messageHistory, idGenerator)
         { }
 
@@ -138,15 +139,18 @@ namespace ServerSentEvent4Net
         protected IMessageHistory mMessageHistory = null;
         protected IMessageIdGenerator mIdGenerator = null;
         protected static readonly slf4net.ILogger _logger = slf4net.LoggerFactory.GetLogger(typeof(ServerSentEvent));
+        protected Timer mHeartbeatTimer = null;
 
-        public ServerSentEvent(int noOfMessagesToRemember, bool generateMessageIds = false)
+
+        public ServerSentEvent(int noOfMessagesToRemember, bool generateMessageIds = false, int heartbeatInterval = 0)
         {
             mMessageHistory = new MemoryMessageHistory(noOfMessagesToRemember);
             if (generateMessageIds)
                 mIdGenerator = new SimpleIdGenerator();
+            SetupHeartbeat(heartbeatInterval);
         }
 
-        public ServerSentEvent(IMessageHistory messageHistory, IMessageIdGenerator idGenerator)
+        public ServerSentEvent(IMessageHistory messageHistory, IMessageIdGenerator idGenerator, int heartbeatInterval = 0)
         {
             if (messageHistory == null)
                 throw new ArgumentException("messageHistory can not be null.");
@@ -156,6 +160,8 @@ namespace ServerSentEvent4Net
 
             mMessageHistory = messageHistory;
             mIdGenerator = idGenerator;
+
+            SetupHeartbeat(heartbeatInterval);
         }
 
         public HttpResponseMessage AddSubscriber(HttpRequestMessage request)
@@ -209,7 +215,7 @@ namespace ServerSentEvent4Net
         private void Send(Message msg)
         {
             // Add id?
-            if (string.IsNullOrWhiteSpace(msg.Id) && mIdGenerator != null)
+            if (string.IsNullOrWhiteSpace(msg.Id) && mIdGenerator != null && !Message.IsOnlyComment(msg))
                 msg.Id = mIdGenerator.GetNextId(msg);
 
             int removed = 0;
@@ -224,7 +230,10 @@ namespace ServerSentEvent4Net
             if (removed > 0)
                 OnSubscriberRemoved(count);
 
-            _logger.Info("Message: " + msg.Data + " sent to " + count.ToString() + " clients.");
+            if(Message.IsOnlyComment(msg))
+                _logger.Trace("Comment: " + msg.Comment + " sent to " + count.ToString() + " clients.");
+            else
+                _logger.Info("Message: " + msg.Data + " sent to " + count.ToString() + " clients.");
         }
 
         protected void OnSubscriberAdded(int subscriberCount)
@@ -243,6 +252,17 @@ namespace ServerSentEvent4Net
                 SubscriberRemoved(this, new SubscriberEventArgs(subscriberCount));
         }
 
+        protected void SetupHeartbeat(int heartbeatInterval)
+        {
+            if(heartbeatInterval > 0)
+                mHeartbeatTimer = new Timer(TimerCallback, null, 1000, heartbeatInterval);
+        }
+
+        private void TimerCallback(object state)
+        {
+            Send(new Message() { Comment = "heartbeat" });
+        }
+
 
         protected class Message : IMessage
         {
@@ -250,6 +270,7 @@ namespace ServerSentEvent4Net
             public string Data { get; set; }
             public string EventType { get; set; }
             public string Retry { get; set; }
+            public string Comment { get; set; }
             public override string ToString()
             {
                 StringBuilder sb = new StringBuilder();
@@ -261,10 +282,20 @@ namespace ServerSentEvent4Net
                     sb.Append("data: ").AppendLine(Data);
                 if (!String.IsNullOrEmpty(Retry))
                     sb.Append("retry: ").AppendLine(Retry);
+                if (!String.IsNullOrEmpty(Comment))
+                    sb.Append(": ").AppendLine(Comment);
 
                 return sb.ToString();
             }
 
+            public static bool IsOnlyComment(IMessage msg)
+            {
+                    return String.IsNullOrEmpty(msg.Id) &&
+                           String.IsNullOrEmpty(msg.EventType) &&
+                           String.IsNullOrEmpty(msg.Data) &&
+                           String.IsNullOrEmpty(msg.Retry) &&
+                           !String.IsNullOrEmpty(msg.Comment);
+            }
         }
 
         protected class Client
@@ -294,7 +325,8 @@ namespace ServerSentEvent4Net
                     StreamWriter.WriteLine(text);
                     StreamWriter.Flush();
 
-                    LastMessageId = msg.Id;
+                    if(!Message.IsOnlyComment(msg))
+                        LastMessageId = msg.Id;
                 }
                 catch (HttpException ex)
                 {
@@ -302,6 +334,10 @@ namespace ServerSentEvent4Net
                     {
                         IsConnected = false;
                     }
+                }
+                catch (System.ServiceModel.CommunicationException)
+                {
+                    IsConnected = false;
                 }
             }
         }

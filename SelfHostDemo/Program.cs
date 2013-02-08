@@ -15,7 +15,7 @@ namespace SelfHostDemo
 {
     public class SSEController : ApiController
     {
-        private static readonly ServerSentEvent SSE = new ServerSentEvent(10, true); 
+        private static readonly ServerSentEvent SSE = new ServerSentEvent(10, true, 25000); 
 
         public HttpResponseMessage Get(HttpRequestMessage request)
         {
