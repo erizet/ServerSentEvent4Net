@@ -72,6 +72,7 @@
     <Compile Include="NoAdditionalClientInformation.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="ServerSentEvent.cs" />
+    <Compile Include="ServerSentEventGeneric.cs" />
     <Compile Include="SimpleIdGenerator.cs" />
     <Compile Include="SubscriberEventArgs.cs" />
   </ItemGroup>

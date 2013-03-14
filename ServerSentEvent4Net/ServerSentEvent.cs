@@ -9,126 +9,6 @@ using System.Web;
 
 namespace ServerSentEvent4Net
 {
-    /// <summary>
-    /// Functionallity for handling and sending a Server-Sent Events from ASP.NET WebApi.
-    /// </summary>
-    /// <typeparam name="ClientInfo">Type to carry additional information for each client/subscriber.</typeparam>
-    public class ServerSentEvent<ClientInfo> : ServerSentEvent
-    {
-        public ServerSentEvent(int noOfMessagesToRemember, bool generateMessageIds = false, int heartbeatInterval = 0)
-            : base(noOfMessagesToRemember, generateMessageIds)
-        { }
-        public ServerSentEvent(IMessageHistory messageHistory, IMessageIdGenerator idGenerator, int heartbeatInterval = 0)
-            : base(messageHistory, idGenerator)
-        { }
-
-        /// <summary>
-        /// Sends data to all subscribers fulfilling the criteria.
-        /// </summary>
-        /// <param name="data">The data to send.</param>
-        /// <param name="criteria">The criteria to be fulfilled to get the data.</param>
-        public void Send(string data, Func<ClientInfo, bool> criteria) { Send(new Message() { Data = data }, criteria); }
-        /// <summary>
-        /// Sends data to all subscribers fulfilling the criteria.
-        /// </summary>
-        /// <param name="data">The data to send.</param>
-        /// <param name="messageId">The id of the message.</param>
-        /// <param name="criteria">The criteria to be fulfilled to get the data.</param>
-        public void Send(string data, string eventType, Func<ClientInfo, bool> criteria) { Send(new Message() { EventType = eventType, Data = data }, criteria); }
-        /// <summary>
-        /// Sends data to all subscribers fulfilling the criteria.
-        /// </summary>
-        /// <param name="eventType">The type of event.</param>
-        /// <param name="data">The data to send.</param>
-        /// <param name="messageId">The id of the message.</param>
-        /// <param name="criteria">The criteria to be fulfilled to get the data.</param>
-        public void Send(string data, string eventType, string messageId, Func<ClientInfo, bool> criteria) { Send(new Message() { EventType = eventType, Data = data, Id = messageId }, criteria); }
-
-        public HttpResponseMessage AddSubscriber(HttpRequestMessage request, ClientInfo clientInfo)
-        {
-            HttpResponseMessage response = request.CreateResponse();
-            response.Content = new PushStreamContentWithClientInfomation<ClientInfo>(OnStreamAvailable, "text/event-stream", clientInfo);
-            return response;
-        }
-
-        protected override void OnStreamAvailable(Stream stream, System.Net.Http.HttpContent content, System.Net.TransportContext context)
-        {
-            ClientInfo info = default(ClientInfo);
-
-            if (content is PushStreamContentWithClientInfomation<ClientInfo>)
-            {
-                PushStreamContentWithClientInfomation<ClientInfo> contentWithInfo = content as PushStreamContentWithClientInfomation<ClientInfo>;
-                info = contentWithInfo.Info;
-            }
-
-            string lastMessageId = GetLastMessageId(content);
-            ClientWithInformation<ClientInfo> client = new ClientWithInformation<ClientInfo>(stream, lastMessageId, info);
-
-            AddClient(client);
-
-        }
-
-        private void Send(Message msg, Func<ClientInfo, bool> criteria)
-        {
-            // Add id?
-            if (string.IsNullOrWhiteSpace(msg.Id) && mIdGenerator != null)
-                msg.Id = mIdGenerator.GetNextId(msg);
-
-            int removed = 0;
-            int count = 0;
-            lock (mLock)
-            {
-                // Only send message to clients fullfilling the criteria
-                var filtered = mClients
-                                .Where(c => c is ClientWithInformation<ClientInfo>)
-                                    .Where(c =>
-                                    {
-                                        var clientWithInfo = c as ClientWithInformation<ClientInfo>;
-                                        return clientWithInfo.Info == null ? false : criteria(clientWithInfo.Info);
-                                    }).ToList();
-                filtered.ForEach(c => c.Send(msg));
-                removed = mClients.RemoveAll(c => !c.IsConnected);
-                count = filtered.Count;
-            }
-
-            if (removed > 0)
-                OnSubscriberRemoved(count);
-
-            _logger.Info("Message: " + msg.Data + " sent to " + count.ToString() + " clients.");
-        }
-
-
-
-        protected class ClientWithInformation<Data> : Client
-        {
-            public ClientWithInformation(Stream stream, string lastMessageId, Data clientInfo)
-                : base(stream, lastMessageId)
-            {
-                this.Info = clientInfo;
-            }
-
-            public ClientWithInformation(Stream stream, Data clientInfo)
-                : base(stream)
-            {
-                this.Info = clientInfo;
-            }
-
-            public Data Info { get; private set; }
-        }
-
-        protected class PushStreamContentWithClientInfomation<Data> : PushStreamContent
-        {
-            public PushStreamContentWithClientInfomation(Action<Stream, HttpContent, System.Net.TransportContext> onStreamAvailable, string mediaType, Data clientInfo)
-                : base(onStreamAvailable, mediaType)
-            {
-                this.Info = clientInfo;
-            }
-
-            public Data Info { get; private set; }
-        }
-    }
-
-
     public class ServerSentEvent : IServerSentEvent
     {
         public event EventHandler<SubscriberEventArgs> SubscriberAdded;
@@ -139,11 +19,13 @@ namespace ServerSentEvent4Net
         protected IMessageHistory mMessageHistory = null;
         protected IMessageIdGenerator mIdGenerator = null;
         protected static readonly slf4net.ILogger _logger = slf4net.LoggerFactory.GetLogger(typeof(ServerSentEvent));
+        protected int mHeartbeatInterval = 0;
         protected Timer mHeartbeatTimer = null;
 
 
         public ServerSentEvent(int noOfMessagesToRemember, bool generateMessageIds = false, int heartbeatInterval = 0)
         {
+            mHeartbeatInterval = heartbeatInterval;
             mMessageHistory = new MemoryMessageHistory(noOfMessagesToRemember);
             if (generateMessageIds)
                 mIdGenerator = new SimpleIdGenerator();
@@ -160,6 +42,7 @@ namespace ServerSentEvent4Net
 
             mMessageHistory = messageHistory;
             mIdGenerator = idGenerator;
+            mHeartbeatInterval = heartbeatInterval;
 
             SetupHeartbeat(heartbeatInterval);
         }
@@ -214,15 +97,21 @@ namespace ServerSentEvent4Net
 
         private void Send(Message msg)
         {
-            // Add id?
-            if (string.IsNullOrWhiteSpace(msg.Id) && mIdGenerator != null && !Message.IsOnlyComment(msg))
-                msg.Id = mIdGenerator.GetNextId(msg);
+            lock (mLock)
+            {
+                SendAndRemoveDisconneced(mClients, msg);
+            }
+        }
+
+        protected void SendAndRemoveDisconneced(List<Client> clientsToSendTo, Message msg)
+        {
+            CheckMessage(msg);
 
             int removed = 0;
             int count = 0;
             lock (mLock)
             {
-                mClients.ForEach(c => c.Send(msg));
+                clientsToSendTo.ForEach(c => c.Send(msg));
                 removed = mClients.RemoveAll(c => !c.IsConnected);
                 count = mClients.Count;
             }
@@ -230,10 +119,21 @@ namespace ServerSentEvent4Net
             if (removed > 0)
                 OnSubscriberRemoved(count);
 
-            if(Message.IsOnlyComment(msg))
+            if (Message.IsOnlyComment(msg))
                 _logger.Trace("Comment: " + msg.Comment + " sent to " + count.ToString() + " clients.");
             else
                 _logger.Info("Message: " + msg.Data + " sent to " + count.ToString() + " clients.");
+        }
+
+        protected void CheckMessage(Message msg)
+        {
+            // Add id?
+            if (string.IsNullOrWhiteSpace(msg.Id) && mIdGenerator != null && !Message.IsOnlyComment(msg))
+                msg.Id = mIdGenerator.GetNextId(msg);
+
+            // Add retry?
+            if (mHeartbeatTimer != null)
+                msg.Retry = mHeartbeatInterval.ToString();
         }
 
         protected void OnSubscriberAdded(int subscriberCount)
@@ -254,8 +154,10 @@ namespace ServerSentEvent4Net
 
         protected void SetupHeartbeat(int heartbeatInterval)
         {
-            if(heartbeatInterval > 0)
+            if (heartbeatInterval > 0)
+            {
                 mHeartbeatTimer = new Timer(TimerCallback, null, 1000, heartbeatInterval);
+            }
         }
 
         private void TimerCallback(object state)
@@ -302,6 +204,7 @@ namespace ServerSentEvent4Net
         {
             public StreamWriter StreamWriter { get; private set; }
             public bool IsConnected { get; private set; }
+            public bool IsRetrySent { get; private set; }
             public string LastMessageId { get; private set; }
 
             public Client(Stream stream, string lastMessageId)
@@ -321,12 +224,19 @@ namespace ServerSentEvent4Net
             {
                 try
                 {
+                    // Only send retry once for each connection
+                    if (IsRetrySent)
+                        msg.Retry = null;
+
                     var text = msg.ToString();
                     StreamWriter.WriteLine(text);
                     StreamWriter.Flush();
 
                     if(!Message.IsOnlyComment(msg))
                         LastMessageId = msg.Id;
+
+                    if (!string.IsNullOrWhiteSpace(msg.Retry))
+                        IsRetrySent = true;
                 }
                 catch (HttpException ex)
                 {

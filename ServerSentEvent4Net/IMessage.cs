@@ -14,7 +14,7 @@ namespace ServerSentEvent4Net
         string Id { get; }
         string Data { get; }
         string EventType { get; }
-        string Retry { get; }
+        string Retry { get; set; }
         string Comment { get; }
     }
 }

@@ -18,7 +18,7 @@ namespace ServerSentEventsTest.Controllers
         private static readonly Lazy<Timer> _timer = new Lazy<Timer>(() => new Timer(TimerCallback, null, 0, 1000));
         private static readonly Lazy<ServerSentEvent<InfoAboutSubscriber>> SSE = new Lazy<ServerSentEvent<InfoAboutSubscriber>>(() =>
         {
-            var sse = new ServerSentEvent<InfoAboutSubscriber>(10);
+            var sse = new ServerSentEvent<InfoAboutSubscriber>(10, true, 5000);
             sse.SubscriberAdded += SSE_SubscriberChanged;
             sse.SubscriberRemoved += SSE_SubscriberChanged;
             return sse;
