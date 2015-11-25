@@ -192,11 +192,11 @@ namespace ServerSentEvent4Net
 
             public static bool IsOnlyComment(IMessage msg)
             {
-                    return String.IsNullOrEmpty(msg.Id) &&
-                           String.IsNullOrEmpty(msg.EventType) &&
-                           String.IsNullOrEmpty(msg.Data) &&
-                           String.IsNullOrEmpty(msg.Retry) &&
-                           !String.IsNullOrEmpty(msg.Comment);
+                return String.IsNullOrEmpty(msg.Id) &&
+                       String.IsNullOrEmpty(msg.EventType) &&
+                       String.IsNullOrEmpty(msg.Data) &&
+                       String.IsNullOrEmpty(msg.Retry) &&
+                       !String.IsNullOrEmpty(msg.Comment);
             }
         }
 
@@ -232,7 +232,7 @@ namespace ServerSentEvent4Net
                     StreamWriter.WriteLine(text);
                     StreamWriter.Flush();
 
-                    if(!Message.IsOnlyComment(msg))
+                    if (!Message.IsOnlyComment(msg))
                         LastMessageId = msg.Id;
 
                     if (!string.IsNullOrWhiteSpace(msg.Retry))
@@ -246,6 +246,10 @@ namespace ServerSentEvent4Net
                     }
                 }
                 catch (System.ServiceModel.CommunicationException)
+                {
+                    IsConnected = false;
+                }
+                catch (IOException)
                 {
                     IsConnected = false;
                 }
