@@ -253,6 +253,10 @@ namespace ServerSentEvent4Net
                 {
                     IsConnected = false;
                 }
+                catch (ObjectDisposedException)
+                {
+                    IsConnected = false;
+                }
             }
         }
     }
